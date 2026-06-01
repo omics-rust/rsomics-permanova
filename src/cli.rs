@@ -61,9 +61,10 @@ impl Tool for Cli {
             precision: self.precision,
         };
 
-        let dm_reader = BufReader::new(File::open(&self.input).map_err(|e| {
-            RsomicsError::InvalidInput(format!("{}: {e}", self.input.display()))
-        })?);
+        let dm_reader =
+            BufReader::new(File::open(&self.input).map_err(|e| {
+                RsomicsError::InvalidInput(format!("{}: {e}", self.input.display()))
+            })?);
         let grouping_reader = BufReader::new(File::open(&self.grouping).map_err(|e| {
             RsomicsError::InvalidInput(format!("{}: {e}", self.grouping.display()))
         })?);

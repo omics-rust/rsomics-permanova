@@ -38,10 +38,7 @@ pub fn parse<R: BufRead>(reader: R, ids: &[String], delim: char) -> Result<Group
         let group = it
             .next()
             .ok_or_else(|| {
-                RsomicsError::InvalidInput(format!(
-                    "grouping line {} has no group column",
-                    i + 1
-                ))
+                RsomicsError::InvalidInput(format!("grouping line {} has no group column", i + 1))
             })?
             .trim();
         if i == 0 && !ids.iter().any(|x| x == id) {
