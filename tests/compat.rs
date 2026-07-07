@@ -139,6 +139,41 @@ fn live_skbio_diff_small() {
     assert_compat(&ours, &theirs, PERMS);
 }
 
+fn run_ours_expect_failure(dm: &str, grouping: &str) -> (bool, String) {
+    let out = Command::new(ours())
+        .arg(golden(dm))
+        .args(["-g", &golden(grouping)])
+        .args(["-p", "0"])
+        .output()
+        .expect("run rsomics-permanova");
+    (
+        out.status.success(),
+        String::from_utf8_lossy(&out.stderr).into_owned(),
+    )
+}
+
+/// A distance matrix scikit-bio's `DistanceMatrix` would reject must not yield a
+/// confident wrong statistic: the binary bails with a non-zero exit.
+#[test]
+fn asymmetric_matrix_fails_loud() {
+    let (ok, stderr) = run_ours_expect_failure("dm_asymmetric.tsv", "groups_tiny.tsv");
+    assert!(
+        !ok,
+        "asymmetric matrix must exit non-zero; stderr: {stderr}"
+    );
+    assert!(stderr.contains("symmetric"), "stderr: {stderr}");
+}
+
+#[test]
+fn nonhollow_matrix_fails_loud() {
+    let (ok, stderr) = run_ours_expect_failure("dm_nonhollow.tsv", "groups_tiny.tsv");
+    assert!(
+        !ok,
+        "non-hollow matrix must exit non-zero; stderr: {stderr}"
+    );
+    assert!(stderr.contains("hollow"), "stderr: {stderr}");
+}
+
 #[test]
 fn live_skbio_diff_three_groups() {
     let Some(py) = skbio_python() else { return };

@@ -1,6 +1,6 @@
 [package]
 name = "rsomics-permanova"
-version = "0.1.0"
+version = "0.1.1"
 description = "PERMANOVA (Anderson 2001) — pseudo-F test for group differences from a distance matrix, with a permutation p-value; scikit-bio skbio.stats.distance.permanova equivalent"
 edition = "2024"
 rust-version = "1.91"

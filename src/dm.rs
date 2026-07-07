@@ -91,6 +91,47 @@ impl DistanceMatrix {
                 "row IDs do not match column IDs in the same order".into(),
             ));
         }
-        Ok(DistanceMatrix { ids, data })
+        let dm = DistanceMatrix { ids, data };
+        dm.validate()?;
+        Ok(dm)
+    }
+
+    /// Reject matrices scikit-bio's `DistanceMatrix` would reject, matching its
+    /// checks and order: unique IDs, hollow diagonal, then symmetric-and-no-NaN.
+    /// A negative distance is allowed (skbio accepts it).
+    ///
+    /// # Errors
+    /// [`RsomicsError::InvalidInput`] on a duplicate ID, a non-zero diagonal
+    /// cell, or an asymmetric or NaN cell.
+    fn validate(&self) -> Result<()> {
+        let n = self.ids.len();
+
+        let mut seen = std::collections::HashSet::with_capacity(n);
+        for id in &self.ids {
+            if !seen.insert(id.as_str()) {
+                return Err(RsomicsError::InvalidInput(format!(
+                    "IDs must be unique. Found the following duplicate IDs: '{id}'"
+                )));
+            }
+        }
+
+        for i in 0..n {
+            if self.data[i * n + i] != 0.0 {
+                return Err(RsomicsError::InvalidInput(
+                    "Data must be hollow (i.e., the diagonal can only contain zeros).".into(),
+                ));
+            }
+        }
+
+        for i in 0..n {
+            for j in i + 1..n {
+                if self.data[i * n + j] != self.data[j * n + i] {
+                    return Err(RsomicsError::InvalidInput(
+                        "Data must be symmetric and cannot contain NaNs.".into(),
+                    ));
+                }
+            }
+        }
+        Ok(())
     }
 }
