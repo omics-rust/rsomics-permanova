@@ -4,12 +4,11 @@ use rayon::prelude::*;
 use rsomics_common::{Result, RsomicsError};
 use serde::Serialize;
 
-mod dm;
 mod grouping;
 mod rng;
 
-pub use dm::DistanceMatrix;
 pub use grouping::{Grouping, parse as parse_grouping};
+pub use rsomics_distance::DistanceMatrix;
 
 use rng::Pcg64;
 
