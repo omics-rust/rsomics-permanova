@@ -3,10 +3,10 @@ use std::io::{BufReader, BufWriter, Write};
 use std::path::PathBuf;
 
 use clap::Parser;
-use rsomics_common::{CommonFlags, Result, RsomicsError, Tool, ToolMeta};
+use rsomics_common::{CommonFlags, Result, RsomicsError, ToolMeta};
 use rsomics_help::{Example, FlagSpec, HelpSpec, Origin, Section};
 
-use rsomics_permanova::{Config, run};
+use rsomics_permanova::{Config, PermanovaResult, compute, write_result};
 
 pub const META: ToolMeta = ToolMeta {
     name: env!("CARGO_PKG_NAME"),
@@ -43,15 +43,12 @@ pub struct Cli {
     pub common: CommonFlags,
 }
 
-impl Tool for Cli {
-    fn meta() -> ToolMeta {
-        META
-    }
-    fn common(&self) -> &CommonFlags {
-        &self.common
-    }
-
-    fn execute(self) -> Result<()> {
+impl Cli {
+    /// Run PERMANOVA and, unless `--json` is set, write the result table to
+    /// the chosen output. Under `--json` the framework serialises the
+    /// returned struct into the result envelope, so nothing is written to
+    /// stdout here.
+    pub fn report(self) -> Result<PermanovaResult> {
         let delim = if self.csv { ',' } else { '\t' };
         let cfg = Config {
             permutations: self.permutations,
@@ -68,15 +65,22 @@ impl Tool for Cli {
         let grouping_reader = BufReader::new(File::open(&self.grouping).map_err(|e| {
             RsomicsError::InvalidInput(format!("{}: {e}", self.grouping.display()))
         })?);
-        let mut out: Box<dyn Write> = if self.output == "-" {
-            Box::new(BufWriter::new(std::io::stdout().lock()))
-        } else {
-            Box::new(BufWriter::new(
-                File::create(&self.output).map_err(RsomicsError::Io)?,
-            ))
-        };
-        run(dm_reader, grouping_reader, &mut out, &cfg)?;
-        out.flush().map_err(RsomicsError::Io)
+
+        let res = compute(dm_reader, grouping_reader, &cfg)?;
+
+        if !self.common.json {
+            let mut out: Box<dyn Write> = if self.output == "-" {
+                Box::new(BufWriter::new(std::io::stdout().lock()))
+            } else {
+                Box::new(BufWriter::new(
+                    File::create(&self.output).map_err(RsomicsError::Io)?,
+                ))
+            };
+            write_result(&mut out, &res, cfg.precision)?;
+            out.flush().map_err(RsomicsError::Io)?;
+        }
+
+        Ok(res)
     }
 }
 

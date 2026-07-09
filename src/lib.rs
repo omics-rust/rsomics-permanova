@@ -2,6 +2,7 @@ use std::io::{BufRead, Write};
 
 use rayon::prelude::*;
 use rsomics_common::{Result, RsomicsError};
+use serde::Serialize;
 
 mod dm;
 mod grouping;
@@ -12,6 +13,7 @@ pub use grouping::{Grouping, parse as parse_grouping};
 
 use rng::Pcg64;
 
+#[derive(Serialize)]
 pub struct PermanovaResult {
     pub sample_size: usize,
     pub num_groups: usize,
@@ -130,16 +132,15 @@ pub struct Config {
     pub precision: usize,
 }
 
-/// Parse a distance matrix + grouping, run PERMANOVA, and write the result table.
+/// Parse a distance matrix + grouping and run PERMANOVA.
 ///
 /// # Errors
 /// Propagates parse errors.
-pub fn run<R: BufRead, G: BufRead, W: Write>(
+pub fn compute<R: BufRead, G: BufRead>(
     dm_reader: R,
     grouping_reader: G,
-    mut out: W,
     cfg: &Config,
-) -> Result<()> {
+) -> Result<PermanovaResult> {
     let dm = DistanceMatrix::parse(dm_reader, cfg.delim)?;
     if dm.n() < 2 {
         return Err(RsomicsError::InvalidInput(
@@ -147,11 +148,30 @@ pub fn run<R: BufRead, G: BufRead, W: Write>(
         ));
     }
     let grouping = parse_grouping(grouping_reader, &dm.ids, cfg.delim)?;
-    let res = permanova(&dm, &grouping, cfg.permutations, cfg.seed, cfg.threads);
+    Ok(permanova(
+        &dm,
+        &grouping,
+        cfg.permutations,
+        cfg.seed,
+        cfg.threads,
+    ))
+}
+
+/// Parse a distance matrix + grouping, run PERMANOVA, and write the result table.
+///
+/// # Errors
+/// Propagates parse and write errors.
+pub fn run<R: BufRead, G: BufRead, W: Write>(
+    dm_reader: R,
+    grouping_reader: G,
+    mut out: W,
+    cfg: &Config,
+) -> Result<()> {
+    let res = compute(dm_reader, grouping_reader, cfg)?;
     write_result(&mut out, &res, cfg.precision)
 }
 
-fn write_result<W: Write>(out: &mut W, res: &PermanovaResult, precision: usize) -> Result<()> {
+pub fn write_result<W: Write>(out: &mut W, res: &PermanovaResult, precision: usize) -> Result<()> {
     writeln!(out, "method name\tPERMANOVA").map_err(RsomicsError::Io)?;
     writeln!(out, "test statistic name\tpseudo-F").map_err(RsomicsError::Io)?;
     writeln!(out, "sample size\t{}", res.sample_size).map_err(RsomicsError::Io)?;
